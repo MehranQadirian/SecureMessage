@@ -43,7 +43,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $root "dist\windows"
 $build = Join-Path $root "build\windows"
-$msys2 = "C:\msys64"
+$msys2 = if ($env:MSYS2_LOCATION) { $env:MSYS2_LOCATION } else { "C:\msys64" }
 $mingw = Join-Path $msys2 "ucrt64.exe"
 $pacman = Join-Path $msys2 "usr\bin\bash.exe"
 
