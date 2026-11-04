@@ -51,7 +51,7 @@ function Say($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Run-InMsys2([string]$cmd) {
     # Runs a command inside the MSYS2 UCRT64 shell (where the native Windows GTK
     # toolchain and its Python live), the same way you would from the MSYS2 shortcut.
-    & "$msys2\usr\bin\bash.exe" -lc "export MSYSTEM=UCRT64; source /etc/profile; $cmd"
+    & "$msys2\usr\bin\bash.exe" -lc "export MSYSTEM=UCRT64; export PATH=/ucrt64/bin:/usr/bin:`$PATH; $cmd"
     if ($LASTEXITCODE -ne 0) { throw "MSYS2 command failed: $cmd" }
 }
 
@@ -86,10 +86,11 @@ if (-not $SkipMsys2Setup) {
                  "mingw-w64-ucrt-x86_64-gst-plugins-base mingw-w64-ucrt-x86_64-gst-plugins-good " +
                  "mingw-w64-ucrt-x86_64-python-pillow mingw-w64-ucrt-x86_64-python-numpy " +
                  "mingw-w64-ucrt-x86_64-python-cryptography mingw-w64-ucrt-x86_64-python-cffi " +
+                 "mingw-w64-ucrt-x86_64-python-argon2_cffi " +
                  "mingw-w64-ucrt-x86_64-pyinstaller"
     Run-InMsys2 "pacman -S --needed --noconfirm $mingwPkgs"
     Say "Installing the pure-Python packages PyInstaller can't get from MSYS2's own repo..."
-    Run-InMsys2 "python -m pip install --upgrade argon2-cffi pqcrypto || python -m pip install --upgrade argon2-cffi kyber-py"
+    Run-InMsys2 "/ucrt64/bin/python.exe -m pip install --upgrade kyber-py"
 } else {
     Say "Skipping MSYS2 setup (-SkipMsys2Setup given); assuming it's already prepared."
 }
@@ -110,10 +111,10 @@ if (-not $SkipFreeze) {
     $pyiArgs = "--noconfirm --clean --windowed --name SecureMessage " +
                "--distpath '$buildUnix' --workpath '$buildUnix/pyinstaller-work' " +
                "--icon '$iconIco' " +
-               "--collect-all gi --collect-all cairo --collect-all cryptography --collect-all pqcrypto " +
+               "--collect-all gi --collect-all cairo --collect-all cryptography --collect-all kyber_py " +
                "--collect-all numpy --collect-all PIL --collect-all argon2 " +
                "--add-data 'icons;icons' main.py"
-    Run-InMsys2 "cd '$srcUnix' && python -m PyInstaller $pyiArgs"
+    Run-InMsys2 "cd '$srcUnix' && /ucrt64/bin/python.exe -m PyInstaller $pyiArgs"
 
     Say "Copying the GTK4/libadwaita runtime (DLLs, icons, GSettings schemas) next to the app..."
     $gtkBin = "$msys2\ucrt64\bin"
