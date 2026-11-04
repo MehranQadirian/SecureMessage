@@ -158,7 +158,15 @@ if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
     dotnet tool install -g wix
     $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
 }
-wix extension add -g WixToolset.UI.wixext 2>$null
+wix eula accept wix7
+if ($LASTEXITCODE -ne 0) {
+    throw "WiX EULA acceptance failed."
+}
+
+wix extension add -g WixToolset.UI.wixext/7.0.1
+if ($LASTEXITCODE -ne 0) {
+    throw "WiX UI extension installation failed."
+}
 
 $productId = [guid]::NewGuid().ToString()
 $upgradeCode = "6E3B1A2E-6B1E-4B8C-9D2B-5E7A8C9F0A11"   # keep this fixed across versions
@@ -218,5 +226,13 @@ $msi = Join-Path $dist "SecureMessage-$version-x64.msi"
 Say "Building $msi ..."
 wix build $wxs -ext WixToolset.UI.wixext -arch x64 -out $msi
 
-Say "Done: $msi"
-Get-Item $msi | Format-List Name, Length, FullName
+if ($LASTEXITCODE -ne 0) {
+    throw "WiX build failed with exit code $LASTEXITCODE."
+}
+
+if (-not (Test-Path -LiteralPath $msi -PathType Leaf)) {
+    throw "WiX build reported success, but the MSI file was not created: $msi"
+}
+
+Say "Successfully created: $msi"
+Get-Item -LiteralPath $msi | Format-List Name, Length, FullName
