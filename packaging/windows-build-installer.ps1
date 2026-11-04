@@ -119,13 +119,13 @@ if (-not $SkipFreeze) {
     Say "Copying the GTK4/libadwaita runtime (DLLs, icons, GSettings schemas) next to the app..."
     $gtkBin = "$msys2\ucrt64\bin"
     $gtkShare = "$msys2\ucrt64\share"
-    Copy-Item "$gtkBin\*.dll" -Destination "$frozenDir\SecureMessage\_internal" -Force
-    New-Item -ItemType Directory -Force -Path "$frozenDir\SecureMessage\_internal\lib\gdk-pixbuf-2.0" | Out-Null
-    Copy-Item "$msys2\ucrt64\lib\gdk-pixbuf-2.0\*" -Destination "$frozenDir\SecureMessage\_internal\lib\gdk-pixbuf-2.0" -Recurse -Force
-    New-Item -ItemType Directory -Force -Path "$frozenDir\SecureMessage\_internal\share" | Out-Null
+    Copy-Item "$gtkBin\*.dll" -Destination "$frozenDir\_internal" -Force
+    New-Item -ItemType Directory -Force -Path "$frozenDir\_internal\lib\gdk-pixbuf-2.0" | Out-Null
+    Copy-Item "$msys2\ucrt64\lib\gdk-pixbuf-2.0\*" -Destination "$frozenDir\_internal\lib\gdk-pixbuf-2.0" -Recurse -Force
+    New-Item -ItemType Directory -Force -Path "$frozenDir\_internal\share" | Out-Null
     foreach ($d in @("glib-2.0", "icons", "gtk-4.0")) {
         if (Test-Path "$gtkShare\$d") {
-            Copy-Item "$gtkShare\$d" -Destination "$frozenDir\SecureMessage\_internal\share\$d" -Recurse -Force
+            Copy-Item "$gtkShare\$d" -Destination "$frozenDir\_internal\share\$d" -Recurse -Force
         }
     }
     # Make the frozen app find its bundled GTK runtime instead of looking at the system.
@@ -141,7 +141,7 @@ os.environ["GDK_PIXBUF_MODULEDIR"] = os.path.join(_base, "lib", "gdk-pixbuf-2.0"
 } else {
     Say "Skipping the freeze step (-SkipFreeze given); reusing $frozenDir"
 }
-if (-not (Test-Path (Join-Path $frozenDir "SecureMessage\SecureMessage.exe"))) {
+if (-not (Test-Path (Join-Path $frozenDir "SecureMessage.exe"))) {
     throw "PyInstaller didn't produce SecureMessage.exe — check the log above."
 }
 
@@ -183,7 +183,7 @@ $wxs = Join-Path $build "SecureMessage.wxs"
     </StandardDirectory>
 
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
-      <Files Include="$($frozenDir -replace '/', '\')\SecureMessage\**" />
+      <Files Include="$($frozenDir -replace '/', '\')\**" />
     </ComponentGroup>
 
     <Component Id="StartMenuShortcut" Directory="AppProgramMenuFolder" Guid="*">
