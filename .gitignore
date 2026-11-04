@@ -1,0 +1,42 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# --- Build / packaging output (produced by packaging/*-build*) ---
+dist/
+build/
+pyinstaller-work/
+_winenv.py
+
+# --- Linux package build artifacts, if built in-place ---
+*.deb
+*.rpm
+*.AppImage
+
+# --- Windows installer build artifacts ---
+*.msi
+*.wixobj
+*.wixpdb
+
+# --- Local, machine-specific state that must never be committed ---
+# (SecureMessage normally keeps these under ~/.local/share and ~/.config,
+#  never inside the repo — these rules are only a safety net if something
+#  is ever pointed at the project folder during testing.)
+keys.json
+settings.json
+*.pylib/
+pylib/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Misc local scratch ---
+*.log
+/tmp/

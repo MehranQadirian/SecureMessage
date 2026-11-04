@@ -1,0 +1,9 @@
+cryptography>=42.0.0
+argon2-cffi>=23.1.0
+numpy>=1.24
+pqcrypto>=0.3.4  # ML-KEM-768 (falls back to kyber-py)
+# Optional, installed on demand from inside the app (private folder):
+#   faster-whisper   offline speech-to-text
+# System packages (Linux):
+# sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 libgtk-4-1 libadwaita-1-0 \
+#   librsvg2-common gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-good gstreamer1.0-pipewire
