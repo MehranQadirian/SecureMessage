@@ -90,6 +90,8 @@ jobs:
             gir1.2-gtk-4.0 \
             gir1.2-adw-1 \
             libgtk-4-1 \
+            libgtk-4-dev \
+            pkg-config \
             libadwaita-1-0 \
             librsvg2-common \
             gir1.2-gstreamer-1.0 \
@@ -143,12 +145,13 @@ jobs:
             mingw-w64-ucrt-x86_64-python-cryptography
             mingw-w64-ucrt-x86_64-python-cffi
             mingw-w64-ucrt-x86_64-pyinstaller
+            mingw-w64-ucrt-x86_64-python-argon2_cffi
 
       - name: Install additional Python dependencies
         shell: msys2 {0}
         run: |
-          python -m pip install --upgrade argon2-cffi pqcrypto || \
-          python -m pip install --upgrade argon2-cffi kyber-py
+          python -m pip install --upgrade pqcrypto || \
+          python -m pip install --upgrade kyber-py
 
       - name: Build Windows MSI
         shell: pwsh
