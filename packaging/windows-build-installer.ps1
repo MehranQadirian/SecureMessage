@@ -14,7 +14,7 @@
     What it does:
       1. Checks for MSYS2 (installs it with winget if missing and you allow it).
       2. Installs Python, PyGObject, GTK4, libadwaita and GStreamer *inside* MSYS2's
-         MINGW64 environment — this is the actual native Windows build of GTK; it is
+         UCRT64 environment — this is the actual native Windows build of GTK; it is
          not WSL and does not need Linux.
       3. Installs SecureMessage's own Python dependencies (cryptography, numpy,
          pqcrypto, ...) into that same environment with pip.
@@ -44,14 +44,14 @@ $root = Split-Path -Parent $PSScriptRoot
 $dist = Join-Path $root "dist\windows"
 $build = Join-Path $root "build\windows"
 $msys2 = "C:\msys64"
-$mingw = Join-Path $msys2 "mingw64.exe"
+$mingw = Join-Path $msys2 "ucrt64.exe"
 $pacman = Join-Path $msys2 "usr\bin\bash.exe"
 
 function Say($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Run-InMsys2([string]$cmd) {
-    # Runs a command inside the MSYS2 MINGW64 shell (where the native Windows GTK
+    # Runs a command inside the MSYS2 UCRT64 shell (where the native Windows GTK
     # toolchain and its Python live), the same way you would from the MSYS2 shortcut.
-    & "$msys2\usr\bin\bash.exe" -lc "export MSYSTEM=MINGW64; source /etc/profile; $cmd"
+    & "$msys2\usr\bin\bash.exe" -lc "export MSYSTEM=UCRT64; source /etc/profile; $cmd"
     if ($LASTEXITCODE -ne 0) { throw "MSYS2 command failed: $cmd" }
 }
 
@@ -76,17 +76,17 @@ if (-not $SkipMsys2Setup) {
         }
     }
 
-    Say "Installing GTK4, libadwaita, GStreamer and Python into MSYS2's MINGW64 environment..."
+    Say "Installing GTK4, libadwaita, GStreamer and Python into MSYS2's UCRT64 environment..."
     Run-InMsys2 "pacman -Syu --noconfirm"
     # One line on purpose: this string is run by *bash* (inside MSYS2), not PowerShell, so
     # it must use bash's own line-continuation (\) if split — easiest to just not split it.
-    $mingwPkgs = "mingw-w64-x86_64-python mingw-w64-x86_64-python-pip " +
-                 "mingw-w64-x86_64-python-gobject mingw-w64-x86_64-gtk4 mingw-w64-x86_64-libadwaita " +
-                 "mingw-w64-x86_64-gobject-introspection mingw-w64-x86_64-librsvg " +
-                 "mingw-w64-x86_64-gst-plugins-base mingw-w64-x86_64-gst-plugins-good " +
-                 "mingw-w64-x86_64-python-pillow mingw-w64-x86_64-python-numpy " +
-                 "mingw-w64-x86_64-python-cryptography mingw-w64-x86_64-python-cffi " +
-                 "mingw-w64-x86_64-python-pyinstaller"
+    $mingwPkgs = "mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-python-pip " +
+                 "mingw-w64-ucrt-x86_64-python-gobject mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-libadwaita " +
+                 "mingw-w64-ucrt-x86_64-gobject-introspection mingw-w64-ucrt-x86_64-librsvg " +
+                 "mingw-w64-ucrt-x86_64-gst-plugins-base mingw-w64-ucrt-x86_64-gst-plugins-good " +
+                 "mingw-w64-ucrt-x86_64-python-pillow mingw-w64-ucrt-x86_64-python-numpy " +
+                 "mingw-w64-ucrt-x86_64-python-cryptography mingw-w64-ucrt-x86_64-python-cffi " +
+                 "mingw-w64-ucrt-x86_64-pyinstaller"
     Run-InMsys2 "pacman -S --needed --noconfirm $mingwPkgs"
     Say "Installing the pure-Python packages PyInstaller can't get from MSYS2's own repo..."
     Run-InMsys2 "python -m pip install --upgrade argon2-cffi pqcrypto || python -m pip install --upgrade argon2-cffi kyber-py"
@@ -116,11 +116,11 @@ if (-not $SkipFreeze) {
     Run-InMsys2 "cd '$srcUnix' && python -m PyInstaller $pyiArgs"
 
     Say "Copying the GTK4/libadwaita runtime (DLLs, icons, GSettings schemas) next to the app..."
-    $gtkBin = "$msys2\mingw64\bin"
-    $gtkShare = "$msys2\mingw64\share"
+    $gtkBin = "$msys2\ucrt64\bin"
+    $gtkShare = "$msys2\ucrt64\share"
     Copy-Item "$gtkBin\*.dll" -Destination "$frozenDir\SecureMessage\_internal" -Force
     New-Item -ItemType Directory -Force -Path "$frozenDir\SecureMessage\_internal\lib\gdk-pixbuf-2.0" | Out-Null
-    Copy-Item "$msys2\mingw64\lib\gdk-pixbuf-2.0\*" -Destination "$frozenDir\SecureMessage\_internal\lib\gdk-pixbuf-2.0" -Recurse -Force
+    Copy-Item "$msys2\ucrt64\lib\gdk-pixbuf-2.0\*" -Destination "$frozenDir\SecureMessage\_internal\lib\gdk-pixbuf-2.0" -Recurse -Force
     New-Item -ItemType Directory -Force -Path "$frozenDir\SecureMessage\_internal\share" | Out-Null
     foreach ($d in @("glib-2.0", "icons", "gtk-4.0")) {
         if (Test-Path "$gtkShare\$d") {

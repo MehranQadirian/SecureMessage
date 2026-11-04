@@ -1,3 +1,4 @@
+
 name: Build and Release SecureMessage
 
 on:
@@ -16,6 +17,7 @@ jobs:
   version:
     name: Detect Application Version
     runs-on: ubuntu-24.04
+
     outputs:
       version: ${{ steps.detect.outputs.version }}
       release_exists: ${{ steps.detect.outputs.release_exists }}
@@ -35,6 +37,7 @@ jobs:
           from pathlib import Path
 
           source = Path("main.py").read_text(encoding="utf-8")
+
           match = re.search(
               r'^\s*APP_VERSION\s*=\s*["\']([^"\']+)["\']',
               source,
@@ -120,26 +123,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup MSYS2
+      - name: Setup MSYS2 UCRT64
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
-            mingw-w64-x86_64-python
-            mingw-w64-x86_64-python-pip
-            mingw-w64-x86_64-python-gobject
-            mingw-w64-x86_64-gtk4
-            mingw-w64-x86_64-libadwaita
-            mingw-w64-x86_64-gobject-introspection
-            mingw-w64-x86_64-librsvg
-            mingw-w64-x86_64-gst-plugins-base
-            mingw-w64-x86_64-gst-plugins-good
-            mingw-w64-x86_64-python-pillow
-            mingw-w64-x86_64-python-numpy
-            mingw-w64-x86_64-python-cryptography
-            mingw-w64-x86_64-python-cffi
-            mingw-w64-x86_64-python-pyinstaller
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-pip
+            mingw-w64-ucrt-x86_64-python-gobject
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-libadwaita
+            mingw-w64-ucrt-x86_64-gobject-introspection
+            mingw-w64-ucrt-x86_64-librsvg
+            mingw-w64-ucrt-x86_64-gst-plugins-base
+            mingw-w64-ucrt-x86_64-gst-plugins-good
+            mingw-w64-ucrt-x86_64-python-pillow
+            mingw-w64-ucrt-x86_64-python-numpy
+            mingw-w64-ucrt-x86_64-python-cryptography
+            mingw-w64-ucrt-x86_64-python-cffi
+            mingw-w64-ucrt-x86_64-pyinstaller
 
       - name: Install additional Python dependencies
         shell: msys2 {0}
@@ -166,6 +169,7 @@ jobs:
       - version
       - build-linux
       - build-windows
+
     if: needs.version.outputs.release_exists == 'false'
     runs-on: ubuntu-24.04
 
@@ -176,7 +180,7 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Publish release
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version.outputs.version }}
