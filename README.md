@@ -1,4 +1,4 @@
-# SecureMessage
+# Secure Message
 
 Linux desktop app for encrypting short messages between trusted colleagues.
 GTK4 + libadwaita, styled after macOS.
@@ -44,13 +44,13 @@ pictures, video, audio, ZIP archives, PDFs, anything.
 2. **Protect with** a password, or a post-quantum key (same as text and voice).
 3. **The encrypted file should be**:
    - **A plain file** — saved as `name-encrypted.smx`. Anyone can see it's an encrypted
-     SecureMessage file, just not open it without the key.
+     Secure Message file, just not open it without the key.
    - **Hidden in a picture** — choose any picture; the result is a PNG that looks identical
      to the eye, with the encrypted file hidden in its low pixel bits.
    - **Hidden in audio** — choose any audio file (WAV, MP3, OGG, FLAC, M4A…); the result
      plays that audio normally, with the encrypted file hidden inside.
 
-**Decrypting** works the same way everywhere in the app: open the file first — SecureMessage
+**Decrypting** works the same way everywhere in the app: open the file first — Secure Message
 works out whether it's a plain encrypted file, or a picture or audio file with something hidden
 inside — and *then* asks for the password or key passphrase. The original file is restored
 byte-for-byte under its original name. A file you don't have the key for, or one with nothing
@@ -65,16 +65,26 @@ MP3, or sending through an app that recompresses images or audio, destroys the h
 A picture or audio file that's too small for what you're hiding will say so and tell you how
 much room it has.
 
-**About hiding things inside video:** SecureMessage does not hide data inside video files. Video
+**About hiding things inside video:** Secure Message does not hide data inside video files. Video
 is heavily compressed; hiding data losslessly would mean re-encoding it uncompressed, producing
 a huge file that plainly isn't the original video — which defeats the point of disguising it.
 Videos work fine as the file *being* encrypted (point 1 above), or as the payload hidden inside
 a picture or audio file if they're small enough.
 
-## Packaging (for distributing SecureMessage)
+## Packaging (for distributing Secure Message)
 
-Scripts in `packaging/` build installable packages from this source tree. Both were tested
-during development as described below — read that before relying on either one blind.
+Releases are built automatically by `.github/workflows/release.yml` whenever `main` is pushed
+and `APP_VERSION` in `main.py` has no release yet. The scripts it uses live in `packaging/`
+and can be run by hand too.
+
+| File in the release | For | Built by |
+|---|---|---|
+| `Secure-Message-<version>-Win-x64.msi` | Windows 10/11, 64-bit | `windows-build-installer.ps1` |
+| `Secure-Message-<version>-amd64.deb` | Debian / Ubuntu family, 64-bit Intel/AMD | `linux-build.sh deb` |
+| `Secure-Message-<version>-x86_64.rpm` | Fedora / RHEL / openSUSE family, 64-bit Intel/AMD | `linux-build.sh rpm` |
+| `Secure-Message-<version>-x86_64.AppImage` | any other 64-bit Linux | `linux-build.sh appimage` |
+
+Release notes come from `.github/release-notes.md` (`{{VERSION}}` is filled in automatically).
 
 ### Linux — `packaging/linux-build.sh`
 
@@ -84,27 +94,16 @@ during development as described below — read that before relying on either one
 ./packaging/linux-build.sh all        # fail instead of silently skipping a missing tool
 ```
 
-Produces, in `dist/linux/`:
-- **`.deb`** — needs `dpkg-dev` (present on virtually every Debian/Ubuntu system already).
-- **`.rpm`** — needs `rpm-build`.
-- **AppImage** — needs network access the first time (downloads `linuxdeploy`, its GTK
-  plugin, and `appimagetool`) and, at build time only, GTK4's *development* package
-  (`libgtk-4-dev` / `gtk4-devel`) so the GTK bundler plugin can find `gtk4.pc`.
+- **`.deb`** (`amd64`) needs `dpkg-dev`; **`.rpm`** (`x86_64`) needs `rpm`/`rpm-build`.
+- **AppImage** needs network access (downloads `linuxdeploy`, its GTK plugin and
+  `appimagetool`) and GTK4's development package (`libgtk-4-dev` / `gtk4-devel`).
 
-These were built and actually run end-to-end while developing this feature: the `.deb` was
-installed with `apt install ./securemessage_*.deb` and launched from `/usr/bin/securemessage`;
-the `.rpm`'s metadata and file list were inspected with `rpm -qpi`/`-qpl`; the AppImage was
-extracted and run directly. The AppImage build also turned up a real bug in the upstream GTK
-bundling plugin (its `gdk-pixbuf` loader cache doesn't resolve inside the AppImage, so every
-SVG icon silently failed to load) — the script works around it by patching the loader
-environment before the final package is produced; this was verified by running the patched
-AppImage and confirming the icons render correctly.
-
-None of the three bundle Python, GTK or libadwaita: those come from the distribution's own
-package manager (each package declares them as dependencies), and SecureMessage installs its
-own pure-Python packages (cryptography, numpy, pqcrypto, ...) into a private folder the first
-time it runs, exactly as it does on a plain `python3 main.py` run — "dependency ها را خودش نصب
-کند" is already how the app behaves, packaged or not.
+The `.deb` and `.rpm` are small on purpose: they carry only the app. GTK, libadwaita, Python
+and the Python libraries (`cryptography`, `numpy`, `Pillow`, `argon2`) are declared as
+dependencies and installed by the package manager. Only `kyber-py` (pure Python, ~100 KB) is
+bundled, so nothing has to be downloaded on first launch. The AppImage additionally bundles
+the GTK stack, which is why it is much larger. The command installed by the packages is
+`securemessage`; the application menu entry is "Secure Message".
 
 ### Windows — `packaging/windows-build-installer.ps1`
 
@@ -112,26 +111,15 @@ time it runs, exactly as it does on a plain `python3 main.py` run — "dependenc
 powershell -ExecutionPolicy Bypass -File packaging\windows-build-installer.ps1
 ```
 
-Produces `dist\windows\SecureMessage-<version>-x64.msi`: a normal double-click installer with
-a Start Menu entry, a desktop shortcut and an uninstaller.
+Produces `dist\windows\Secure-Message-<version>-Win-x64.msi`. It installs MSYS2 (the native
+GTK4 + libadwaita build for Windows), freezes the app with PyInstaller (`--windowed`, so no
+console window) into `Secure Message.exe`, bundles the GTK and GStreamer runtime, runs the
+frozen app once with `--selftest` (numpy, Pillow, crypto, Voice and Files modules; the build
+fails if anything is missing) and packages the result with the WiX Toolset.
 
-**Important — this script has not been run on an actual Windows machine**, because none was
-available while building it. It installs MSYS2 (the real, native build of GTK4 + libadwaita
-for Windows — the same approach GIMP and Inkscape ship with), freezes the app with PyInstaller
-into a self-contained folder, and packages that with the WiX Toolset. The logic was reasoned
-through carefully and a real bug was already caught and fixed on review (a PowerShell
-here-string used `` ` `` line continuations for a command that actually runs inside *bash*,
-which treats `` ` `` as command substitution, not continuation — fixed to single-line commands).
-But static review only goes so far: **run it on Windows, and if it stops with an error, share
-that error** rather than assuming the whole approach is broken — most likely it's a specific
-package name or path that needs adjusting, not the overall design.
+Errors in the windowed app are written to `%LOCALAPPDATA%\Secure Message\logs`.
 
-Why not a native Win32 rewrite instead? Because that would mean a second, complete user
-interface — the main window, Voice, Files, Keys — written from scratch in a different toolkit,
-impossible to verify without a Windows machine, and a permanent maintenance burden keeping two
-UIs in sync. Bundling the real GTK runtime is the same thing production GTK apps actually ship
-on Windows, and it means the Linux and Windows builds are provably the same, already-tested code.
-
+## Run
 ## Run
 
 ```bash
