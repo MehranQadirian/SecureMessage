@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Build a self-contained Windows installer (.msi) for SecureMessage.
+    Build a self-contained Windows installer (.msi) for Secure Message.
 
 .DESCRIPTION
     *** This script has not been run on an actual Windows machine. ***
     It was written and reasoned through carefully (the same real GTK4 + libadwaita code
-    SecureMessage already runs and was tested with on Linux, via the standard MSYS2
+    Secure Message already runs and was tested with on Linux, via the standard MSYS2
     runtime that real GTK apps use on Windows — e.g. GIMP, Inkscape), but there is no
     Windows environment available to run and debug it in. Treat the first run as a
     first draft: read any error it gives you, and tell me what went wrong so it can be
@@ -16,13 +16,13 @@
       2. Installs Python, PyGObject, GTK4, libadwaita and GStreamer *inside* MSYS2's
          UCRT64 environment — this is the actual native Windows build of GTK; it is
          not WSL and does not need Linux.
-      3. Installs SecureMessage's own Python dependencies (cryptography, numpy,
+      3. Installs Secure Message's own Python dependencies (cryptography, numpy,
          pqcrypto, ...) into that same environment with pip.
       4. Freezes the application with PyInstaller into a self-contained onedir build
          (Python + GTK + every .dll it needs), so the person who installs the MSI
          needs nothing else — no internet access, no MSYS2, no Python.
       5. Builds an .msi with the WiX Toolset (installed via `dotnet tool install` if
-         missing) so double-clicking it installs SecureMessage like any other Windows
+         missing) so double-clicking it installs Secure Message like any other Windows
          application, with a Start Menu shortcut and an uninstaller.
 
     Run this from an elevated ("Run as Administrator") PowerShell window, from the
@@ -30,7 +30,7 @@
 
         powershell -ExecutionPolicy Bypass -File packaging\windows-build-installer.ps1
 
-    Output: dist\windows\SecureMessage-<version>-x64.msi
+    Output: dist\windows\Secure-Message-<version>-Win-x64.msi
 #>
 
 [CmdletBinding()]
@@ -41,6 +41,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
+$appName = "Secure Message"
 $dist = Join-Path $root "dist\windows"
 $build = Join-Path $root "build\windows"
 $msys2 = if ($env:MSYS2_LOCATION) { $env:MSYS2_LOCATION } else { "C:\msys64" }
@@ -58,7 +59,7 @@ function Run-InMsys2([string]$cmd) {
 New-Item -ItemType Directory -Force -Path $dist, $build | Out-Null
 
 $version = (Select-String -Path (Join-Path $root "main.py") -Pattern 'APP_VERSION = "([^"]+)"').Matches[0].Groups[1].Value
-Say "SecureMessage $version — building the Windows installer"
+Say "$appName $version — building the Windows installer"
 
 # ---------------------------------------------------------------------------
 # 1) MSYS2 — the native-Windows GTK4 + libadwaita + Python toolchain
@@ -98,7 +99,8 @@ if (-not $SkipMsys2Setup) {
 # ---------------------------------------------------------------------------
 # 2) Freeze with PyInstaller — one self-contained folder, nothing needed at install time
 # ---------------------------------------------------------------------------
-$frozenDir = Join-Path $build "SecureMessage"
+$frozenDir = Join-Path $build $appName
+$exePath = Join-Path $frozenDir "$appName.exe"
 $iconIco = (Join-Path $root "icons\windows\securemessage.ico") -replace '\\', '/'
 if (-not $SkipFreeze) {
     Say "Freezing the app with PyInstaller (this takes a few minutes)..."
@@ -108,11 +110,18 @@ if (-not $SkipFreeze) {
     # sys.frozen (set automatically by PyInstaller) makes bootstrap.ensure_ready() a no-op
     # (see bootstrap.py): everything needed is already in this bundle, so there is nothing
     # left to install on first run. One line, for the same reason as $mingwPkgs above.
-    $pyiArgs = "--noconfirm --clean --console --name SecureMessage " +
+    # --windowed: a GUI program with no console, so no black CMD window appears before the
+    # app. Errors go to %LOCALAPPDATA%\Secure Message\logs (see windows-runtime-hook.py).
+    # The Voice and Files windows are imported lazily, so every module is listed explicitly.
+    $hidden = (@("voice_studio","files_studio","keys_window","stt","audio","vault","stego_image",
+                 "voice_codec","pylib","file_vault","file_vault_window","selftest") |
+               ForEach-Object { "--hidden-import $_" }) -join " "
+    $pyiArgs = "--noconfirm --clean --windowed --name '$appName' " +
                "--distpath '$buildUnix' --workpath '$buildUnix/pyinstaller-work' " +
                "--icon '$iconIco' " +
                "--collect-all gi --collect-all cairo --collect-all cryptography --collect-all kyber_py " +
                "--collect-all numpy --collect-all PIL --collect-all argon2 " +
+               "$hidden " +
                "--runtime-hook '$srcUnix/packaging/windows-runtime-hook.py' " +
                "--add-data 'icons;icons' main.py"
     Run-InMsys2 "cd '$srcUnix' && /ucrt64/bin/python.exe -m PyInstaller $pyiArgs"
@@ -150,21 +159,32 @@ if (-not $SkipFreeze) {
             Copy-Item "$gtkShare\$d" -Destination "$frozenDir\_internal\share\$d" -Recurse -Force
         }
     }
-    # Make the frozen app find its bundled GTK runtime instead of looking at the system.
-    @"
-import os, sys
-_base = os.path.join(os.path.dirname(sys.executable), "_internal")
-os.environ["GSETTINGS_SCHEMA_DIR"] = os.path.join(_base, "share", "glib-2.0", "schemas")
-os.environ["XDG_DATA_DIRS"] = os.path.join(_base, "share")
-os.environ["GDK_PIXBUF_MODULEDIR"] = os.path.join(_base, "lib", "gdk-pixbuf-2.0", "2.10.0", "loaders")
-"@ | Out-File -Encoding utf8 (Join-Path $root "_winenv.py")
-    Say "NOTE: _winenv.py was generated as a helper; if GTK can't find its schemas/icons at" `
-        "runtime, import it at the very top of main.py (before the Gtk/Adw import) and re-freeze."
+    # GStreamer plugins (needed by the Voice window and for audio files)
+    $gstPlugins = "$msys2\ucrt64\lib\gstreamer-1.0"
+    if (-not (Test-Path $gstPlugins)) { throw "GStreamer plugins not found: $gstPlugins" }
+    $gstDest = "$frozenDir\_internal\lib\gstreamer-1.0"
+    New-Item -ItemType Directory -Force -Path $gstDest | Out-Null
+    Copy-Item "$gstPlugins\*.dll" -Destination $gstDest -Force
+    Say "Copied $((Get-ChildItem "$gstDest\*.dll").Count) GStreamer plugins."
 } else {
     Say "Skipping the freeze step (-SkipFreeze given); reusing $frozenDir"
 }
-if (-not (Test-Path (Join-Path $frozenDir "SecureMessage.exe"))) {
-    throw "PyInstaller didn't produce SecureMessage.exe — check the log above."
+if (-not (Test-Path $exePath)) {
+    throw "PyInstaller didn't produce '$appName.exe' — check the log above."
+}
+
+# ---------------------------------------------------------------------------
+# 2b) Self test: run the frozen app once, headless, so a bundle in which the Voice or
+#     Files windows can't load fails the build here instead of on a user's computer.
+# ---------------------------------------------------------------------------
+Say "Self-testing the frozen app (numpy, Pillow, crypto, Voice and Files modules)..."
+$report = Join-Path $build "selftest-report.txt"
+Remove-Item $report -ErrorAction SilentlyContinue
+$proc = Start-Process -FilePath $exePath -ArgumentList @("--selftest", "`"$report`"") -Wait -PassThru
+if (Test-Path $report) { Get-Content $report | ForEach-Object { Write-Host "    $_" } }
+else { Write-Host "    (no report was written)" }
+if ($proc.ExitCode -ne 0) {
+    throw "The frozen app failed its self test (exit code $($proc.ExitCode)). See the report above."
 }
 
 # ---------------------------------------------------------------------------
@@ -197,19 +217,19 @@ $wxs = Join-Path $build "SecureMessage.wxs"
 @"
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="SecureMessage" Manufacturer="Mehran Ghadirian" Version="$version"
+  <Package Name="$appName" Manufacturer="Mehran Ghadirian" Version="$version"
            UpgradeCode="$upgradeCode" Language="1033" Scope="perMachine">
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of SecureMessage is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of $appName is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Icon Id="AppIcon.ico" SourceFile="$($iconIco -replace '/', '\')" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="SecureMessage" />
+      <Directory Id="INSTALLFOLDER" Name="$appName" />
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="AppProgramMenuFolder" Name="SecureMessage" />
+      <Directory Id="AppProgramMenuFolder" Name="$appName" />
     </StandardDirectory>
 
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
@@ -217,23 +237,23 @@ $wxs = Join-Path $build "SecureMessage.wxs"
     </ComponentGroup>
 
     <Component Id="StartMenuShortcut" Directory="AppProgramMenuFolder" Guid="*">
-      <Shortcut Id="StartMenuShortcut" Name="SecureMessage"
-                Target="[INSTALLFOLDER]SecureMessage.exe" WorkingDirectory="INSTALLFOLDER"
+      <Shortcut Id="StartMenuShortcut" Name="$appName"
+                Target="[INSTALLFOLDER]$appName.exe" WorkingDirectory="INSTALLFOLDER"
                 Icon="AppIcon.ico" />
       <RemoveFolder Id="RemoveAppProgramMenuFolder" On="uninstall" />
       <RegistryValue Root="HKCU" Key="Software\SecureMessage" Name="installed" Type="integer"
                       Value="1" KeyPath="yes" />
     </Component>
     <Component Id="DesktopShortcut" Directory="INSTALLFOLDER" Guid="*">
-      <Shortcut Id="DesktopShortcut" Name="SecureMessage" Directory="DesktopFolder"
-                Target="[INSTALLFOLDER]SecureMessage.exe" WorkingDirectory="INSTALLFOLDER"
+      <Shortcut Id="DesktopShortcut" Name="$appName" Directory="DesktopFolder"
+                Target="[INSTALLFOLDER]$appName.exe" WorkingDirectory="INSTALLFOLDER"
                 Icon="AppIcon.ico" />
       <RegistryValue Root="HKCU" Key="Software\SecureMessage" Name="desktop_shortcut" Type="integer"
                       Value="1" KeyPath="yes" />
     </Component>
     <StandardDirectory Id="DesktopFolder" />
 
-    <Feature Id="Main" Title="SecureMessage" Level="1">
+    <Feature Id="Main" Title="$appName" Level="1">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DesktopShortcut" />
@@ -244,7 +264,7 @@ $wxs = Join-Path $build "SecureMessage.wxs"
 </Wix>
 "@ | Set-Content -Encoding utf8 $wxs
 
-$msi = Join-Path $dist "SecureMessage-$version-x64.msi"
+$msi = Join-Path $dist "Secure-Message-$version-Win-x64.msi"
 Say "Building $msi ..."
 wix build $wxs -ext WixToolset.UI.wixext -arch x64 -out $msi
 

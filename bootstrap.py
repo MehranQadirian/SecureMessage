@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cross-distro bootstrap for SecureMessage.
+Cross-distro bootstrap for Secure Message.
 Detects package manager, installs system + Python deps via GUI.
 """
 
@@ -111,7 +111,8 @@ def _importable(module: str) -> bool:
 def need_python_packages() -> list[str]:
     """pip names of required packages that are missing."""
     missing = []
-    for mod, pkg in [("cryptography", "cryptography"), ("argon2", "argon2-cffi"), ("numpy", "numpy")]:
+    for mod, pkg in [("cryptography", "cryptography"), ("argon2", "argon2-cffi"), ("numpy", "numpy"),
+                     ("PIL", "Pillow")]:
         if not _importable(mod):
             missing.append(pkg)
     # ML-KEM: PQClean build preferred, pure-Python fallback
@@ -189,7 +190,7 @@ def run_bootstrap_gui() -> bool:
         return _console_bootstrap()
 
     root = tk.Tk()
-    root.title("SecureMessage - Setup")
+    root.title("Secure Message - Setup")
     root.geometry("520x320")
     root.resizable(False, False)
 
@@ -202,7 +203,7 @@ def run_bootstrap_gui() -> bool:
     frame = ttk.Frame(root, padding=20)
     frame.pack(fill="both", expand=True)
 
-    title = ttk.Label(frame, text="Preparing SecureMessage", font=("", 14, "bold"))
+    title = ttk.Label(frame, text="Preparing Secure Message", font=("", 14, "bold"))
     title.pack(anchor="w", pady=(0, 8))
 
     status = ttk.Label(frame, text="Checking requirements…", wraplength=460, justify="left")
@@ -295,7 +296,7 @@ def run_bootstrap_gui() -> bool:
 
 def _console_bootstrap() -> bool:
     """Fallback without any GUI."""
-    print("=== SecureMessage bootstrap (console) ===")
+    print("=== Secure Message bootstrap (console) ===")
     py_missing = need_python_packages()
     if py_missing:
         print("Installing Python packages:", py_missing)

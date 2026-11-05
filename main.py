@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SecureMessage – encrypt and decrypt short messages between trusted colleagues.
+Secure Message – encrypt and decrypt short messages between trusted colleagues.
 
 GTK4 + libadwaita, styled after macOS. One screen, two columns:
     left  – your text, the shared password, the algorithm and the two actions
@@ -11,12 +11,20 @@ from __future__ import annotations
 
 import sys
 import threading
+import traceback
 import unicodedata
 
 # ---------------------------------------------------------------------------
 # Bootstrap first (before any Gtk import)
 # ---------------------------------------------------------------------------
 from bootstrap import ensure_ready
+
+if "--selftest" in sys.argv:
+    # Used by the build pipeline to verify a packaged build; see selftest.py
+    import selftest
+    _i = sys.argv.index("--selftest")
+    _report = sys.argv[_i + 1] if len(sys.argv) > _i + 1 else "selftest-report.txt"
+    sys.exit(selftest.run(_report))
 
 if not ensure_ready():
     print("Bootstrap failed. Cannot start.")
@@ -94,7 +102,7 @@ class MainWindow(Adw.ApplicationWindow):
         super().__init__(application=app)
         self.app = app
         self.settings = app.settings
-        self.set_title("SecureMessage")
+        self.set_title("Secure Message")
         self.set_default_size(1080, 700)
         self.set_size_request(360, 480)
 
@@ -167,7 +175,7 @@ class MainWindow(Adw.ApplicationWindow):
         header.set_show_start_title_buttons(False)   # we draw our own traffic lights
         header.set_show_end_title_buttons(False)
         header.pack_start(traffic_lights(self))
-        header.set_title_widget(Adw.WindowTitle(title="SecureMessage",
+        header.set_title_widget(Adw.WindowTitle(title="Secure Message",
                                                 subtitle="Encrypt and decrypt text"))
 
         # Help / about popover
@@ -254,7 +262,7 @@ class MainWindow(Adw.ApplicationWindow):
         loaded = []
         pop.connect("show", lambda *_: loaded or (loaded.append(1), load_github_avatar(avatar)))
 
-        about = Gtk.Button(label="About SecureMessage")
+        about = Gtk.Button(label="About Secure Message")
         about.add_css_class("flat")
         about.connect("clicked", lambda *_: (pop.popdown(), self.show_about()))
         box.append(about)
@@ -838,6 +846,7 @@ class MainWindow(Adw.ApplicationWindow):
             from voice_studio import VoiceStudio
             self.studio = VoiceStudio(self)
         except Exception as exc:
+            traceback.print_exc()
             self.toast(ToastKind.ERROR, f"Voice isn’t available: {exc}")
             return
         self.studio.present()
@@ -851,6 +860,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.files_win = FilesStudio(self)
             self.files_win.connect("close-request", lambda *_: (setattr(self, "files_win", None), False)[1])
         except Exception as exc:
+            traceback.print_exc()
             self.toast(ToastKind.ERROR, f"Files isn’t available: {exc}")
             return
         self.files_win.present()
@@ -934,7 +944,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def show_about(self):
         kwargs = dict(
-            application_name="SecureMessage",
+            application_name="Secure Message",
             application_icon=APP_ID,
             developer_name=DEVELOPER,
             developers=[f"{DEVELOPER} {DEVELOPER_URL}"],
@@ -1013,6 +1023,7 @@ class SecureMessageApp(Adw.Application):
 
 
 def main():
+    GLib.set_application_name("Secure Message")
     Adw.init()
     app = SecureMessageApp()
     sys.exit(app.run(sys.argv))

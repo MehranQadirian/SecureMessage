@@ -54,3 +54,71 @@ if os.path.isdir(pixbuf_dir):
 gio_modules = os.path.join(BASE, "lib", "gio", "modules")
 if os.path.isdir(gio_modules):
     add_path("GIO_EXTRA_MODULES", gio_modules)
+
+# ---------------------------------------------------------------------------
+# GStreamer (Voice recording / playback)
+# ---------------------------------------------------------------------------
+gst_plugins = os.path.join(BASE, "lib", "gstreamer-1.0")
+if os.path.isdir(gst_plugins):
+    os.environ["GST_PLUGIN_PATH"] = gst_plugins
+    os.environ["GST_PLUGIN_SYSTEM_PATH"] = gst_plugins
+    # Scan plugins inside this process. The default helper (gst-plugin-scanner.exe) is a
+    # console program and would flash a black window the first time Voice is opened.
+    os.environ["GST_REGISTRY_FORK"] = "no"
+    _local = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    _cache = os.path.join(_local, "Secure Message")
+    try:
+        os.makedirs(_cache, exist_ok=True)
+        os.environ["GST_REGISTRY"] = os.path.join(_cache, "gst-registry.bin")
+    except OSError:
+        pass
+
+# ---------------------------------------------------------------------------
+# No console in the windowed build: keep output and errors in a log file, and tell
+# the person if the app dies before any window could be shown.
+# ---------------------------------------------------------------------------
+def _log_dir():
+    root = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    path = os.path.join(root, "Secure Message", "logs")
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        return None
+    return path
+
+
+_logs = _log_dir()
+if _logs and (sys.stdout is None or sys.stderr is None):
+    try:
+        _fh = open(os.path.join(_logs, "secure-message.log"), "a", buffering=1, encoding="utf-8")
+        if sys.stdout is None:
+            sys.stdout = _fh
+        if sys.stderr is None:
+            sys.stderr = _fh
+    except OSError:
+        pass
+
+_default_hook = sys.excepthook
+
+
+def _fatal(exc_type, exc, tb):
+    import traceback
+    text = "".join(traceback.format_exception(exc_type, exc, tb))
+    try:
+        if sys.stderr is not None:
+            sys.stderr.write(text)
+    except Exception:
+        pass
+    if "--selftest" not in sys.argv:
+        try:
+            import ctypes
+            where = f"\n\nDetails were saved in:\n{_logs}" if _logs else ""
+            ctypes.windll.user32.MessageBoxW(
+                0, f"Secure Message couldn't start.\n\n{exc_type.__name__}: {exc}{where}",
+                "Secure Message", 0x10)
+        except Exception:
+            pass
+    _default_hook(exc_type, exc, tb)
+
+
+sys.excepthook = _fatal
