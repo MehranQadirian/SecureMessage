@@ -13,7 +13,7 @@ import sys
 import traceback
 
 
-def run(report_path: str) -> int:
+def run(report_path: str, gtk_first: bool = False) -> int:
     lines: list[str] = []
     hard_fail = False
 
@@ -56,10 +56,17 @@ def run(report_path: str) -> int:
             __import__(name)
         return _f
 
+    if gtk_first:                      # same load order as the real app: GTK before NumPy
+        def gtk_load():
+            import gi
+            gi.require_version("Gtk", "4.0"); gi.require_version("Adw", "1")
+            from gi.repository import Gtk, Adw  # noqa: F401
+            import audio  # noqa: F401  (loads GStreamer)
+        step("load GTK + GStreamer first", gtk_load, hard=False)
     step("numpy", numpy_check)
     step("Pillow", pillow_check)
     step("crypto engine", crypto_check)
-    for name in ("stego_image", "voice_codec", "vault", "stt", "voice_studio", "files_studio", "keys_window"):
+    for name in ("stego_image", "voice_codec", "vault", "stt", "voice_studio", "files_studio", "keys_window", "updater", "update_window"):
         step(f"import {name}", mod(name))
     step("GStreamer", gst_check, hard=False)          # voice recording only; not fatal
 

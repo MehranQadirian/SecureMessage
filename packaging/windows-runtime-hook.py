@@ -122,3 +122,43 @@ def _fatal(exc_type, exc, tb):
 
 
 sys.excepthook = _fatal
+
+# ---------------------------------------------------------------------------
+# NumPy / OpenBLAS
+#
+# Opening Voice or Files used to fail with "DLL load failed while importing
+# _multiarray_umath: A dynamic link library (DLL) initialization routine failed".
+# NumPy's OpenBLAS tries to start one worker thread per CPU core and detect the CPU when
+# its DLL loads, and on some machines that initialisation fails - more likely once GTK has
+# already loaded its own DLLs. This app only does small array operations, so:
+#   1. keep OpenBLAS single-threaded,
+#   2. import NumPy now, before GTK is loaded, and
+#   3. if that still fails, retry with an older, universally supported CPU target.
+# A failure here is logged and is not fatal: the main window still opens.
+# ---------------------------------------------------------------------------
+for _name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_name, "1")
+
+
+def _preload_numpy():
+    attempts = (None, "Haswell", "Nehalem")           # None = let OpenBLAS pick
+    last = None
+    for coretype in attempts:
+        if coretype:
+            os.environ["OPENBLAS_CORETYPE"] = coretype
+        try:
+            import numpy  # noqa: F401
+            if coretype:
+                print(f"NumPy loaded with OPENBLAS_CORETYPE={coretype}", file=sys.stderr)
+            return
+        except Exception as exc:                       # ImportError, or the DLL init failure
+            last = exc
+            for key in [k for k in sys.modules if k == "numpy" or k.startswith("numpy.")]:
+                del sys.modules[key]
+            print(f"NumPy import failed ({coretype or 'default'}): {exc}", file=sys.stderr)
+    os.environ.pop("OPENBLAS_CORETYPE", None)
+    print(f"NumPy could not be loaded: {last}", file=sys.stderr)
+
+
+if not os.environ.get("SM_NO_NUMPY_PRELOAD"):
+    _preload_numpy()
