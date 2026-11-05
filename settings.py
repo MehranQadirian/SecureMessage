@@ -7,7 +7,8 @@ from pathlib import Path
 
 from gi.repository import GLib
 
-_DEFAULTS = {"theme": "system", "algorithm": 0, "method": "password", "key": ""}
+_DEFAULTS = {"theme": "system", "algorithm": 0, "method": "password", "key": "",
+             "auto_update": True, "last_update_check": 0}
 
 
 class Settings:
