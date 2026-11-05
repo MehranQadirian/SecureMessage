@@ -108,17 +108,39 @@ if (-not $SkipFreeze) {
     # sys.frozen (set automatically by PyInstaller) makes bootstrap.ensure_ready() a no-op
     # (see bootstrap.py): everything needed is already in this bundle, so there is nothing
     # left to install on first run. One line, for the same reason as $mingwPkgs above.
-    $pyiArgs = "--noconfirm --clean --windowed --name SecureMessage " +
+    $pyiArgs = "--noconfirm --clean --console --name SecureMessage " +
                "--distpath '$buildUnix' --workpath '$buildUnix/pyinstaller-work' " +
                "--icon '$iconIco' " +
                "--collect-all gi --collect-all cairo --collect-all cryptography --collect-all kyber_py " +
                "--collect-all numpy --collect-all PIL --collect-all argon2 " +
+               "--runtime-hook '$srcUnix/packaging/windows-runtime-hook.py' " +
                "--add-data 'icons;icons' main.py"
     Run-InMsys2 "cd '$srcUnix' && /ucrt64/bin/python.exe -m PyInstaller $pyiArgs"
 
     Say "Copying the GTK4/libadwaita runtime (DLLs, icons, GSettings schemas) next to the app..."
     $gtkBin = "$msys2\ucrt64\bin"
     $gtkShare = "$msys2\ucrt64\share"
+
+    # Bundle GObject Introspection typelibs (GTK4, GDK4, Adwaita, GLib...)
+    $giTypelib = "$msys2\ucrt64\lib\girepository-1.0"
+    $giDest = "$frozenDir\_internal\lib\girepository-1.0"
+
+    if (-not (Test-Path $giTypelib)) {
+        throw "GObject Introspection typelib directory not found: $giTypelib"
+    }
+
+    New-Item -ItemType Directory -Force -Path $giDest | Out-Null
+
+    $typelibs = @(Get-ChildItem "$giTypelib\*.typelib")
+
+    if ($typelibs.Count -eq 0) {
+        throw "No GObject Introspection typelibs found."
+    }
+
+    Copy-Item "$giTypelib\*.typelib" -Destination $giDest -Force
+
+    Say "Copied $($typelibs.Count) GI typelib files."
+
     Copy-Item "$gtkBin\*.dll" -Destination "$frozenDir\_internal" -Force
     New-Item -ItemType Directory -Force -Path "$frozenDir\_internal\lib\gdk-pixbuf-2.0" | Out-Null
     Copy-Item "$msys2\ucrt64\lib\gdk-pixbuf-2.0\*" -Destination "$frozenDir\_internal\lib\gdk-pixbuf-2.0" -Recurse -Force
