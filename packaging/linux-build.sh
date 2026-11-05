@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# linux-build.sh — build .deb, .rpm and an AppImage for SecureMessage.
+# linux-build.sh — build .deb, .rpm and an AppImage for Secure Message.
 #
 # This does NOT bundle Python, GTK or libadwaita: those come from the distro's own
 # package manager (every build declares them as dependencies), and SecureMessage
@@ -31,21 +31,38 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_ID="com.securemessage.app"
-APP_NAME="SecureMessage"
+APP_NAME="Secure Message"
+FILE_BASE="Secure-Message"      # release file names: no spaces, short enough not to be cut off by GitHub
 VERSION="$(grep -m1 'APP_VERSION = ' "$ROOT/main.py" | sed -E 's/.*"([^"]+)".*/\1/')"
-ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)"
+# These packages are built for 64-bit Intel/AMD only (like the AppImage). The architecture is
+# fixed here rather than read from the build machine, so it can never come out as "all"/"noarch".
+DEB_ARCH="amd64"
+RPM_ARCH="x86_64"
 OUT="$ROOT/dist/linux"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 mkdir -p "$OUT"
-echo "SecureMessage $VERSION — building for: ${*:-auto}"
+echo "Secure Message $VERSION — building for: ${*:-auto}"
 
 # Runtime dependencies, written once and reused for both .deb and the AppImage's
 # desktop file. Names differ between deb and rpm distros, so each target below
 # uses its own list (see bootstrap.py's SYSTEM_PACKAGES for where these come from).
-DEB_DEPS="python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, gir1.2-adw-1, libgtk-4-1, libadwaita-1-0, librsvg2-common, gir1.2-gstreamer-1.0, gir1.2-gst-plugins-base-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, python3-pip"
-RPM_DEPS="python3 python3-gobject gtk4 libadwaita librsvg2 gstreamer1 gstreamer1-plugins-base gstreamer1-plugins-good python3-pip"
+# The Python libraries (cryptography, numpy, Pillow, argon2) come from the distro too, so
+# nothing has to be downloaded on first launch. Only kyber-py (pure Python, ~100 KB) is
+# shipped inside the package, because no distro packages it.
+DEB_DEPS="python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, gir1.2-adw-1, libgtk-4-1, libadwaita-1-0, librsvg2-common, gir1.2-gstreamer-1.0, gir1.2-gst-plugins-base-1.0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, python3-cryptography, python3-numpy, python3-pil, python3-argon2, python3-pip"
+RPM_DEPS="python3 python3-gobject gtk4 libadwaita librsvg2 gstreamer1 gstreamer1-plugins-base gstreamer1-plugins-good python3-cryptography python3-numpy python3-pillow python3-argon2-cffi python3-pip"
+
+# Pure-Python packages bundled into every build (see pylib.VENDOR).
+vendor_packages() {  # $1 = destination folder
+    install -d "$1"
+    python3 -m pip install --quiet --disable-pip-version-check --no-deps \
+        --target "$1" "kyber-py==1.2.0" --break-system-packages 2>/dev/null \
+      || python3 -m pip install --quiet --disable-pip-version-check --no-deps --target "$1" "kyber-py==1.2.0"
+    rm -rf "$1"/bin
+    [ -d "$1/kyber_py" ] || { echo "error: could not download kyber-py"; exit 1; }
+}
 
 # ---------------------------------------------------------------------------
 # Shared: the files every package installs (source tree + launcher + desktop entry)
@@ -61,6 +78,7 @@ stage_payload() {  # $1 = staging root
     rsync -a --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' \
              --exclude='dist' --exclude='packaging' --exclude='icons/windows' \
              "$ROOT"/ "$stage/usr/share/securemessage/"
+    vendor_packages "$stage/usr/share/securemessage/vendor"
 
     cat > "$stage/usr/bin/securemessage" <<EOF
 #!/bin/sh
@@ -113,11 +131,11 @@ Package: securemessage
 Version: $VERSION
 Section: utils
 Priority: optional
-Architecture: $ARCH
+Architecture: $DEB_ARCH
 Depends: $DEB_DEPS
 Maintainer: Mehran Ghadirian <https://github.com/mehranqadirian>
 Description: Encrypt and decrypt text, voice and files
- SecureMessage encrypts text, voice recordings and arbitrary files with a
+ Secure Message encrypts text, voice recordings and arbitrary files with a
  password or a post-quantum key (ML-KEM-768 + X25519), and can hide the
  result inside a picture or an audio file.
 EOF
@@ -129,7 +147,7 @@ command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -qtf /
 exit 0
 EOF
     chmod 755 "$stage/DEBIAN/postinst"
-    local file="$OUT/securemessage_${VERSION}_${ARCH}.deb"
+    local file="$OUT/${FILE_BASE}-${VERSION}-${DEB_ARCH}.deb"
     dpkg-deb --build --root-owner-group "$stage" "$file" >/dev/null
     echo "    $file"
 }
@@ -154,13 +172,17 @@ Summary:        Encrypt and decrypt text, voice and files
 License:        MIT
 URL:            https://github.com/mehranqadirian/securemessage
 Source0:        securemessage-$VERSION.tar.gz
-BuildArch:      noarch
+ExclusiveArch:   x86_64
 Requires:       $RPM_DEPS
 
 %description
-SecureMessage encrypts text, voice recordings and arbitrary files with a
+Secure Message encrypts text, voice recordings and arbitrary files with a
 password or a post-quantum key (ML-KEM-768 + X25519), and can hide the
 result inside a picture or an audio file.
+
+%global debug_package %{nil}
+%global __os_install_post %{nil}
+%global __brp_python_bytecompile %{nil}
 
 %prep
 %setup -q -c -T
@@ -185,9 +207,13 @@ gtk-update-icon-cache -qtf /usr/share/icons/hicolor 2>/dev/null || :
 * $(date "+%a %b %d %Y") Mehran Ghadirian <https://github.com/mehranqadirian> - $VERSION-1
 - Automated build
 EOF
-    rpmbuild --define "_topdir $topdir" -bb "$topdir/SPECS/securemessage.spec" >/dev/null
-    find "$topdir/RPMS" -name '*.rpm' -exec cp {} "$OUT/" \;
-    echo "    $(find "$OUT" -maxdepth 1 -name '*.rpm' -newer "$topdir/SPECS/securemessage.spec")"
+    rpmbuild --target "$RPM_ARCH" --define "_topdir $topdir" -bb "$topdir/SPECS/securemessage.spec" >/dev/null
+    local built
+    built="$(find "$topdir/RPMS" -name '*.rpm' | head -1)"
+    [ -n "$built" ] || { echo "    rpmbuild produced no package"; return 1; }
+    local final="$OUT/${FILE_BASE}-${VERSION}-${RPM_ARCH}.rpm"
+    cp "$built" "$final"
+    echo "    $final"
 }
 
 # ---------------------------------------------------------------------------
@@ -204,6 +230,7 @@ build_appimage() {
     rsync -a --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' \
              --exclude='dist' --exclude='packaging' --exclude='icons/windows' \
              "$ROOT"/ "$usr/share/securemessage/"
+    vendor_packages "$usr/share/securemessage/vendor"
 
     cat > "$usr/bin/securemessage" <<'EOF'
 #!/bin/sh
@@ -240,7 +267,7 @@ EOF
     chmod +x "$tools/linuxdeploy" "$tools/linuxdeploy-plugin-gtk.sh" "$tools/appimagetool"
 
     # Needs python3 + PyGObject itself present at build time (to copy them in);
-    # install python3-gi beforehand the same way you would to run SecureMessage.
+    # install python3-gi beforehand the same way you would to run Secure Message.
     if ! python3 -c "import gi" >/dev/null 2>&1; then
         echo "    error: python3-gi isn't installed on this build machine (needed so the"
         echo "           AppImage can bundle it). Install it, then re-run."
@@ -276,14 +303,14 @@ EOF
     if [ -f "$hook" ]; then
         cat >> "$hook" <<'HOOKEOF'
 
-# --- SecureMessage fix: see the comment above this block in linux-build.sh.
+# --- Secure Message fix: see the comment above this block in linux-build.sh.
 export GDK_PIXBUF_MODULEDIR="$APPDIR/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders"
 export LD_LIBRARY_PATH="$GDK_PIXBUF_MODULEDIR:$LD_LIBRARY_PATH"
 HOOKEOF
     fi
     chmod -R a+rX "$extracted"
     chmod a+rx "$extracted/AppRun"
-    local final="$OUT/SecureMessage-$VERSION-x86_64.AppImage"
+    local final="$OUT/${FILE_BASE}-${VERSION}-x86_64.AppImage"
     rm -f "$final"
     if ! ARCH=x86_64 "$tools/appimagetool" "$extracted" "$final" 2>&1 | tail -n 15; then
         ARCH=x86_64 "$tools/appimagetool" --appimage-extract-and-run "$extracted" "$final"
