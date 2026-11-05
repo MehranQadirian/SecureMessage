@@ -114,7 +114,7 @@ if (-not $SkipFreeze) {
     # app. Errors go to %LOCALAPPDATA%\Secure Message\logs (see windows-runtime-hook.py).
     # The Voice and Files windows are imported lazily, so every module is listed explicitly.
     $hidden = (@("voice_studio","files_studio","keys_window","stt","audio","vault","stego_image",
-                 "voice_codec","pylib","file_vault","file_vault_window","selftest") |
+                 "voice_codec","pylib","file_vault","file_vault_window","selftest","updater","update_window") |
                ForEach-Object { "--hidden-import $_" }) -join " "
     $pyiArgs = "--noconfirm --clean --windowed --name '$appName' " +
                "--distpath '$buildUnix' --workpath '$buildUnix/pyinstaller-work' " +
@@ -186,6 +186,17 @@ else { Write-Host "    (no report was written)" }
 if ($proc.ExitCode -ne 0) {
     throw "The frozen app failed its self test (exit code $($proc.ExitCode)). See the report above."
 }
+
+# Same checks again in the load order of the real app (GTK first, NumPy second, no preload):
+# this is informational. It shows whether the order itself was what broke NumPy on some PCs.
+Say "Diagnostic: GTK-first load order without the NumPy preload (informational only)..."
+$report2 = Join-Path $build "selftest-report-gtk-first.txt"
+Remove-Item $report2 -ErrorAction SilentlyContinue
+$env:SM_NO_NUMPY_PRELOAD = "1"
+$proc2 = Start-Process -FilePath $exePath -ArgumentList @("--selftest", "`"$report2`"", "--gtk-first") -Wait -PassThru
+Remove-Item Env:\SM_NO_NUMPY_PRELOAD -ErrorAction SilentlyContinue
+if (Test-Path $report2) { Get-Content $report2 | ForEach-Object { Write-Host "    $_" } }
+Say "Diagnostic finished with exit code $($proc2.ExitCode)."
 
 # ---------------------------------------------------------------------------
 # 3) WiX Toolset — build the .msi

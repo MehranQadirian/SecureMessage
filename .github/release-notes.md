@@ -1,6 +1,13 @@
-## Secure Message {{VERSION}} — first public release
+## Secure Message {{VERSION}}
 
 Secure Message encrypts and decrypts **text, voice recordings and any file** between people who trust each other. Everything happens on your own computer — nothing is uploaded anywhere.
+
+### What's new
+
+- **Automatic updates.** Secure Message checks this page for new releases (Help menu → *Check for updates…*), downloads the right file for your system, verifies its checksum, installs it and restarts. On Windows it runs the installer; with the AppImage it replaces itself; with `.deb`/`.rpm` it installs the package after a permission prompt. You can turn the automatic check off in the same menu.
+- **Windows:** fixed *Voice* and *Files* failing with a NumPy "DLL load failed" error; the app now opens without a console window.
+- **Linux:** `.deb` and `.rpm` are explicitly 64-bit (`amd64` / `x86_64`) and no longer need an internet connection on first launch.
+- The app and its files are now called **Secure Message**.
 
 ### Which file should I download?
 

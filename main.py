@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 import traceback
 import unicodedata
 
@@ -24,7 +25,7 @@ if "--selftest" in sys.argv:
     import selftest
     _i = sys.argv.index("--selftest")
     _report = sys.argv[_i + 1] if len(sys.argv) > _i + 1 else "selftest-report.txt"
-    sys.exit(selftest.run(_report))
+    sys.exit(selftest.run(_report, gtk_first="--gtk-first" in sys.argv))
 
 if not ensure_ready():
     print("Bootstrap failed. Cannot start.")
@@ -45,7 +46,7 @@ from widgets import (ActionButton, ToastHost, ToastKind, load_github_avatar,  # 
                      make_icon, register_icons, traffic_lights)
 
 APP_ID = "com.securemessage.app"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.0.1"
 DEVELOPER = "Mehran Ghadirian"
 DEVELOPER_URL = "https://github.com/mehranqadirian"
 MAX_DETECT_CHARS = 4_000_000
@@ -126,6 +127,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._apply_method(initial=True)
         self._refresh_state()
         self.msg_view.grab_focus()
+        GLib.timeout_add_seconds(5, self._auto_update_check)   # quietly, a few seconds after start
 
     # ------------------------------------------------------------------ UI
     def _build_ui(self):
@@ -261,6 +263,16 @@ class MainWindow(Adw.ApplicationWindow):
         box.append(dev)
         loaded = []
         pop.connect("show", lambda *_: loaded or (loaded.append(1), load_github_avatar(avatar)))
+
+        box.append(Gtk.Separator())
+        upd = Gtk.Button(label="Check for updates…")
+        upd.add_css_class("flat")
+        upd.connect("clicked", lambda *_: (pop.popdown(), self.check_updates(silent=False)))
+        box.append(upd)
+        auto = Gtk.CheckButton(label="Check automatically")
+        auto.set_active(bool(self.settings.get("auto_update")))
+        auto.connect("toggled", lambda b: self.settings.set("auto_update", b.get_active()))
+        box.append(auto)
 
         about = Gtk.Button(label="About Secure Message")
         about.add_css_class("flat")
@@ -830,6 +842,20 @@ class MainWindow(Adw.ApplicationWindow):
             self.studio.refresh_keys()
         if self.files_win is not None:
             self.files_win.refresh_keys()
+
+    def check_updates(self, silent: bool = True):
+        from update_window import UpdateWindow
+        self.settings.set("last_update_check", time.time())
+        UpdateWindow(self, APP_VERSION, silent=silent)
+
+    def _auto_update_check(self):
+        try:
+            from update_window import should_auto_check
+            if should_auto_check(self.settings):
+                self.check_updates(silent=True)
+        except Exception:
+            traceback.print_exc()
+        return False
 
     def open_keys(self, *_):
         from keys_window import KeysWindow

@@ -177,8 +177,10 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $r = "build/windows/selftest-report.txt"
-          if (Test-Path $r) { Get-Content $r } else { Write-Host "No self-test report." }
+          foreach ($r in "build/windows/selftest-report.txt", "build/windows/selftest-report-gtk-first.txt") {
+            Write-Host "=== $r"
+            if (Test-Path $r) { Get-Content $r } else { Write-Host "No report." }
+          }
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4

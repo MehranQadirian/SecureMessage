@@ -119,6 +119,16 @@ fails if anything is missing) and packages the result with the WiX Toolset.
 
 Errors in the windowed app are written to `%LOCALAPPDATA%\Secure Message\logs`.
 
+## Updates
+
+*Help → Check for updates…* (and a quiet automatic check a few seconds after start, at most
+every 12 hours; switch it off under the same menu) asks the GitHub API for the latest release of
+`MehranQadirian/SecureMessage`. If it is newer, the file for this system is picked by its
+name (see the table above), downloaded and checked against `SHA256SUMS.txt`, installed, and
+the app restarts: Windows runs the `.msi`, an AppImage replaces itself, `.deb`/`.rpm` installs
+through `pkexec`. A copy run from source only opens the release page. Logic: `updater.py`;
+dialog: `update_window.py`.
+
 ## Run
 ## Run
 
