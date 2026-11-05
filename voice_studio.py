@@ -781,7 +781,7 @@ class VoiceStudio(Adw.Window):
             return True
         self._async(self.install_btn, work, lambda _r: (
             self.install_btn.done(3000),
-            self.toast(ToastKind.SUCCESS, "Installed. Restart SecureMessage to use the microphone.")),
+            self.toast(ToastKind.SUCCESS, "Installed. Restart Secure Message to use the microphone.")),
             "Installing audio support…")
 
     # ------------------------------------------------------------------ speech to text

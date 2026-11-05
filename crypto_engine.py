@@ -255,7 +255,7 @@ def public_to_text(public: bytes) -> str:
 def public_from_text(text: str) -> bytes:
     t = "".join(text.split())
     if not t.startswith(PUBLIC_PREFIX):
-        raise ValueError("That isn't a SecureMessage public key.")
+        raise ValueError("That isn't a Secure Message public key.")
     body = t[len(PUBLIC_PREFIX):]
     try:
         raw = base64.urlsafe_b64decode(body + "=" * (-len(body) % 4))
@@ -291,7 +291,7 @@ class BlobInfo:
 
 def inspect_blob(blob: bytes) -> BlobInfo:
     if len(blob) < 6 or blob[:4] != MAGIC:
-        raise ValueError("Not an encrypted SecureMessage.")
+        raise ValueError("Not an encrypted Secure Message.")
     mode, alg_id = blob[4], blob[5]
     if alg_id not in _ID_ALG or mode not in (MODE_PASSWORD, MODE_PQ):
         raise ValueError("Unsupported encryption format.")

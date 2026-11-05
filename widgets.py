@@ -1,4 +1,4 @@
-"""Reusable GTK widgets for SecureMessage."""
+"""Reusable GTK widgets for Secure Message."""
 
 from __future__ import annotations
 
@@ -383,7 +383,7 @@ def load_github_avatar(avatar: Adw.Avatar) -> None:
 
     def fetch():
         try:
-            req = urllib.request.Request(AVATAR_URL, headers={"User-Agent": "SecureMessage"})
+            req = urllib.request.Request(AVATAR_URL, headers={"User-Agent": "Secure-Message"})
             with urllib.request.urlopen(req, timeout=8) as resp:
                 data = resp.read(2_000_000)
             cache.parent.mkdir(parents=True, exist_ok=True)

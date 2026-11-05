@@ -507,7 +507,7 @@ class FilesStudio(Adw.Window):
                         repeats, cover_name: str | None):
         if disguise == "plain":
             desc = "Saved as a plain encrypted file."
-            note = "Anyone can see it's an encrypted SecureMessage file (but not open it without the key)."
+            note = "Anyone can see it's an encrypted Secure Message file (but not open it without the key)."
         elif disguise == "image":
             desc = f"Hidden inside “{cover_name}”. It looks like an ordinary picture."
             note = ("Keep it as PNG. Re-saving it as JPEG or another lossy format, or sending it "

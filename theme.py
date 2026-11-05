@@ -1,5 +1,5 @@
 """
-Visual theme for SecureMessage.
+Visual theme for Secure Message.
 
 macOS-inspired look built entirely on GTK4 + libadwaita:
   * one palette per colour scheme, injected through libadwaita's named colours
